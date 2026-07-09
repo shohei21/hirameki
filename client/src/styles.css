@@ -1,0 +1,605 @@
+:root {
+  color-scheme: light;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  background-color: #f7f3ea;
+  color: #2b2620;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  max-width: 1200px;
+  margin: 1.5rem auto;
+  padding: 0 1rem 2rem;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: #fffdf8;
+  border: 1px solid #e4dcc8;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.app-header__controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-gear-button {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #e4dcc8;
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.settings-note {
+  font-size: 0.8rem;
+  color: #5a5342;
+  margin: 0;
+}
+
+.empty-state {
+  padding: 2rem;
+  background: #fffdf8;
+  border: 1px solid #e4dcc8;
+  border-radius: 8px;
+  line-height: 1.8;
+}
+
+.main-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.stage-stepper,
+.chat-column,
+.workbench {
+  background: #fffdf8;
+  border: 1px solid #e4dcc8;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.stage-stepper ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stage-step {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stage-step--active {
+  background: #f0e6cf;
+  border-color: #d8c9a3;
+  font-weight: bold;
+}
+
+.stage-step__order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #e4dcc8;
+  font-size: 0.8rem;
+}
+
+.stage-step__description {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #5a5342;
+}
+
+.chat-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 400px;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 300px;
+  max-height: 55vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  white-space: pre-wrap;
+}
+
+.chat-bubble p {
+  margin: 0;
+}
+
+.chat-bubble--user {
+  align-self: flex-end;
+  background: #e8dfc8;
+}
+
+.chat-bubble--assistant {
+  align-self: flex-start;
+  background: #eef1e8;
+}
+
+.chat-bubble--streaming {
+  opacity: 0.85;
+}
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.typing-indicator span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #8a8371;
+  animation: typing-bounce 1.1s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-0.25rem);
+    opacity: 1;
+  }
+}
+
+.chat-empty {
+  color: #8a8371;
+  font-size: 0.9rem;
+}
+
+.chat-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #9c3b2e;
+  font-size: 0.85rem;
+}
+
+.chat-setup-card {
+  background: #f5efe0;
+  border: 1px solid #d8c9a3;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.chat-setup-card pre {
+  background: #2b2620;
+  color: #f7f3ea;
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.chat-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-input-row textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  padding: 0.5rem;
+}
+
+.chat-input-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-extract-error {
+  color: #9c3b2e;
+  font-size: 0.85rem;
+}
+
+.incubate-banner {
+  background: #eef1e8;
+  border: 1px solid #cdd6bd;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.incubate-banner--due {
+  background: #f5efe0;
+  border-color: #d8c9a3;
+}
+
+.incubate-banner__set {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.workbench-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.workbench-tabs button {
+  flex: 1;
+  padding: 0.4rem;
+  border: 1px solid #e4dcc8;
+  background: #fffdf8;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.workbench-tabs button.is-active {
+  background: #f0e6cf;
+  border-color: #d8c9a3;
+  font-weight: bold;
+}
+
+.workbench-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card-add-form,
+.spark-add-form,
+.combination-note-form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.card-add-form input,
+.spark-add-form input,
+.combination-note-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem;
+}
+
+.card-list,
+.combination-list,
+.spark-list,
+.card-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.card-item,
+.combination-item,
+.spark-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.4rem;
+  border: 1px solid #e4dcc8;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  transition: background-color 0.3s ease;
+}
+
+.card-item--new {
+  animation: card-highlight 1.2s ease-out;
+}
+
+@keyframes card-highlight {
+  0% {
+    background-color: #f0e6cf;
+    border-color: #d8c9a3;
+  }
+  100% {
+    background-color: transparent;
+    border-color: #e4dcc8;
+  }
+}
+
+.spark-item {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.card-item__text {
+  flex: 1;
+}
+
+.card-badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.card-badge--specific {
+  background: #4a6fa5;
+}
+
+.card-badge--general {
+  background: #4a8f5f;
+}
+
+.candidate-list {
+  border: 1px dashed #d8c9a3;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.candidate-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+}
+
+.empty {
+  color: #8a8371;
+  font-size: 0.85rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* mobile-tabbar(z-index:20)より必ず手前に出す(DOM順に関わらず) */
+  z-index: 30;
+}
+
+.modal {
+  background: #fffdf8;
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: min(420px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.spark-fab {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.spark-fab__button {
+  border-radius: 999px;
+  padding: 0.7rem 1.2rem;
+  background: #2b2620;
+  color: #f7f3ea;
+  border: none;
+  cursor: pointer;
+}
+
+.spark-fab__panel {
+  background: #fffdf8;
+  border: 1px solid #e4dcc8;
+  border-radius: 8px;
+  padding: 0.75rem;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spark-fab__panel textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.spark-fab__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   T10: レスポンシブ(900px未満)
+   1カラム表示 + 下部タブバー(ステージ/チャット/ワークベンチ)。
+   PC幅(900px以上)ではここから下のスタイルは適用されず、既存の3カラムを維持する。
+   ========================================================================== */
+
+.mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .app-shell {
+    margin: 0 auto;
+    padding: 0.75rem 0.75rem
+      calc(64px + env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  /* 1カラム化: main-layout の3ブロックのうち data-active-tab に対応するものだけ表示する */
+  .main-layout {
+    display: block;
+  }
+
+  .main-layout > .stage-stepper,
+  .main-layout > .chat-column,
+  .main-layout > .workbench {
+    display: none;
+  }
+
+  .main-layout[data-active-tab="stage"] > .stage-stepper {
+    display: block;
+  }
+
+  .main-layout[data-active-tab="chat"] > .chat-column {
+    display: flex;
+  }
+
+  .main-layout[data-active-tab="workbench"] > .workbench {
+    display: block;
+  }
+
+  .chat-column {
+    min-height: calc(100vh - 220px);
+  }
+
+  .chat-messages {
+    max-height: none;
+    flex: 1;
+    padding-bottom: 6rem;
+  }
+
+  /* チャット入力欄はタブバーの上に固定フッター化。iOSセーフエリアを考慮する */
+  .chat-input-row {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    margin: 0;
+    background: #fffdf8;
+    border-top: 1px solid #e4dcc8;
+    padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom));
+    z-index: 15;
+  }
+
+  /* 下部タブバー */
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: #fffdf8;
+    border-top: 1px solid #e4dcc8;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-tabbar button {
+    flex: 1;
+    padding: 0.7rem 0;
+    background: none;
+    border: none;
+    border-top: 2px solid transparent;
+    font-size: 0.8rem;
+    color: #5a5342;
+  }
+
+  .mobile-tabbar button.is-active {
+    font-weight: bold;
+    color: #2b2620;
+    border-top-color: #2b2620;
+  }
+
+  /* 閃きFABはタブバーの上に浮かせる */
+  .spark-fab {
+    right: 1rem;
+    bottom: calc(56px + env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  /* モーダルは全幅 */
+  .modal-overlay {
+    align-items: flex-end;
+  }
+
+  .modal {
+    width: 100vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 12px 12px 0 0;
+  }
+}

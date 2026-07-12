@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   projectsRepo,
   messagesRepo,
+  settingsRepo,
+  guideSeenRepo,
   trimMessagesPerProject,
 } from "./storage";
 import type { Project, ChatMessage } from "../types";
@@ -150,5 +152,58 @@ describe("message trimming (500 per project)", () => {
     messagesRepo.save(messages);
     const loaded = messagesRepo.load();
     expect(loaded).toHaveLength(500);
+  });
+});
+
+describe("settingsRepo (T13: effort round-trip + 後方互換)", () => {
+  it("未保存時はeffort='low'を含むデフォルト設定を返す", () => {
+    const loaded = settingsRepo.load();
+    expect(loaded).toEqual({ apiKey: "", model: "claude-opus-4-8", effort: "low" });
+  });
+
+  it("effortを含む設定を保存すればそのまま読み込める(round-trip)", () => {
+    settingsRepo.save({ apiKey: "sk-ant-x", model: "claude-sonnet-5", effort: "high" });
+    expect(settingsRepo.load()).toEqual({
+      apiKey: "sk-ant-x",
+      model: "claude-sonnet-5",
+      effort: "high",
+    });
+  });
+
+  it("Phase5以前に保存されたeffort無しのsettingsは後方互換で'low'扱いになる", () => {
+    localStorage.setItem(
+      "hirameki:v1:settings",
+      JSON.stringify({
+        schemaVersion: 1,
+        data: { apiKey: "sk-ant-legacy", model: "claude-opus-4-8" },
+      }),
+    );
+    expect(settingsRepo.load()).toEqual({
+      apiKey: "sk-ant-legacy",
+      model: "claude-opus-4-8",
+      effort: "low",
+    });
+  });
+
+  it("不正なeffort値はデフォルト'low'にフォールバックする", () => {
+    localStorage.setItem(
+      "hirameki:v1:settings",
+      JSON.stringify({
+        schemaVersion: 1,
+        data: { apiKey: "", model: "claude-opus-4-8", effort: "ultra" },
+      }),
+    );
+    expect(settingsRepo.load().effort).toBe("low");
+  });
+});
+
+describe("guideSeenRepo (T13: 使い方ガイド初回自動表示の既読フラグ)", () => {
+  it("未保存時はfalse", () => {
+    expect(guideSeenRepo.load()).toBe(false);
+  });
+
+  it("保存すればtrueがround-tripする", () => {
+    guideSeenRepo.save(true);
+    expect(guideSeenRepo.load()).toBe(true);
   });
 });

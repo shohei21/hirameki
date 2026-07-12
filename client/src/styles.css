@@ -53,6 +53,70 @@ body {
   line-height: 1;
 }
 
+/* T13: ヘッダーの「使い方」ボタン(settings-gear-buttonがmargin-left:autoで右寄せの
+   起点になるため、このボタンはそれより後ろに置きgapで隣接させる) */
+.guide-header-button {
+  background: none;
+  border: 1px solid #e4dcc8;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.guide-modal {
+  width: min(480px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.guide-intro,
+.guide-tabs {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.guide-tabs {
+  border-top: 1px solid #e4dcc8;
+  padding-top: 0.75rem;
+}
+
+.guide-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.guide-stages li {
+  background: #f5efe0;
+  border: 1px solid #e4dcc8;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.guide-stages h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.guide-stages p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #3c362b;
+}
+
 .settings-note {
   font-size: 0.8rem;
   color: #5a5342;
@@ -203,6 +267,18 @@ body {
   opacity: 0.85;
 }
 
+/* T13(中断対策c): 自動送信された継続指示のuserターンは、目立たせすぎないよう
+   小さく・控えめに表示する(履歴には本文全体を保存している) */
+.chat-bubble--auto {
+  align-self: center;
+  max-width: 60%;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: #8a8371;
+  background: transparent;
+  border: 1px dashed #d8c9a3;
+}
+
 .typing-indicator {
   display: inline-flex;
   align-items: center;
@@ -260,6 +336,21 @@ body {
   overflow-y: auto;
 }
 
+/* T13(中断対策c): 「続きから再開」。エラーの有無にかかわらず(max_tokensで
+   正常終了した場合も)表示しうるので、chat-errorの赤系スタイルとは分ける */
+.chat-continue {
+  display: flex;
+}
+
+.chat-continue button {
+  background: #f0e6cf;
+  border: 1px solid #d8c9a3;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .chat-setup-card {
   background: #f5efe0;
   border: 1px solid #d8c9a3;
@@ -284,9 +375,14 @@ body {
 
 .chat-input-row textarea {
   width: 100%;
-  resize: vertical;
+  /* T13: 1行の高さから内容に応じてrows属性で自動拡張し(lib/autosize.ts)、
+     最大5行を超えた分はtextarea自身の内部スクロールに任せる。
+     手動リサイズは自動拡張と競合するため無効化する。 */
+  resize: none;
+  overflow-y: auto;
   font-family: inherit;
   padding: 0.5rem;
+  line-height: 1.4;
 }
 
 .chat-input-actions {
@@ -591,17 +687,24 @@ body {
     padding-bottom: 6rem;
   }
 
-  /* チャット入力欄はタブバーの上に固定フッター化。iOSセーフエリアを考慮する */
+  /* チャット入力欄はタブバーの上に固定フッター化。iOSセーフエリアを考慮する。
+     T13: textareaがrows自動拡張になったため、フッター自体の余白は詰めて
+     ズーム時(iOS自動ズーム込み)にも見切れにくくする。 */
   .chat-input-row {
     position: fixed;
     left: 0;
     right: 0;
     bottom: calc(56px + env(safe-area-inset-bottom));
     margin: 0;
+    gap: 0.35rem;
     background: #fffdf8;
     border-top: 1px solid #e4dcc8;
-    padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom));
+    padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
     z-index: 15;
+  }
+
+  .chat-input-row textarea {
+    padding: 0.35rem 0.5rem;
   }
 
   /* 下部タブバー */

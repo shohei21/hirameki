@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useHiramekiStore } from "../store";
 import SettingsModal from "./SettingsModal";
+import GuideModal from "./GuideModal";
 
 export default function ProjectHeader(): JSX.Element {
   const projects = useHiramekiStore((s) => s.projects);
@@ -8,6 +9,10 @@ export default function ProjectHeader(): JSX.Element {
   const setActiveProjectId = useHiramekiStore((s) => s.setActiveProjectId);
   const createProject = useHiramekiStore((s) => s.createProject);
   const deleteProject = useHiramekiStore((s) => s.deleteProject);
+  // T13: 使い方ガイドの開閉はストアで共有し、ヘッダーのボタン・モバイル下部タブ・
+  // 初回自動表示のどこからでもこの同じ状態を介してモーダルを開ける。
+  const guideOpen = useHiramekiStore((s) => s.guideOpen);
+  const setGuideOpen = useHiramekiStore((s) => s.setGuideOpen);
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -56,6 +61,13 @@ export default function ProjectHeader(): JSX.Element {
             削除
           </button>
         )}
+        <button
+          type="button"
+          className="guide-header-button"
+          onClick={() => setGuideOpen(true)}
+        >
+          使い方
+        </button>
         <button
           type="button"
           className="settings-gear-button"
@@ -115,6 +127,7 @@ export default function ProjectHeader(): JSX.Element {
       )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
     </header>
   );
 }

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useHiramekiStore } from "./store";
 import { useChatController } from "./lib/useChatController";
+import { guideSeenRepo } from "./lib/storage";
 import ProjectHeader from "./components/ProjectHeader";
 import StageStepper from "./components/StageStepper";
 import IncubateBanner from "./components/IncubateBanner";
@@ -16,6 +17,7 @@ type MobileTab = "stage" | "chat" | "workbench";
 export default function App(): JSX.Element {
   const projects = useHiramekiStore((s) => s.projects);
   const activeProjectId = useHiramekiStore((s) => s.activeProjectId);
+  const setGuideOpen = useHiramekiStore((s) => s.setGuideOpen);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chat");
 
   const activeProject = useMemo(
@@ -24,6 +26,16 @@ export default function App(): JSX.Element {
   );
 
   const controller = useChatController(activeProject);
+
+  useEffect(() => {
+    // T13: 初回起動時(プロジェクト0件かつ未読フラグなし)は使い方ガイドを自動表示する。
+    // マウント時に一度だけ判定すればよいため依存配列は空にする。
+    if (projects.length === 0 && !guideSeenRepo.load()) {
+      setGuideOpen(true);
+      guideSeenRepo.save(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="app-shell">
@@ -59,6 +71,9 @@ export default function App(): JSX.Element {
               onClick={() => setMobileTab("workbench")}
             >
               ワークベンチ
+            </button>
+            <button type="button" onClick={() => setGuideOpen(true)}>
+              使い方
             </button>
           </nav>
         </>

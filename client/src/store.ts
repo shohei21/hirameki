@@ -36,6 +36,10 @@ interface HiramekiState {
   messages: ChatMessage[];
   streaming: boolean;
   settings: Settings;
+  // T13: 使い方ガイドモーダルの開閉状態(永続化しない、エフェメラルなUI状態)。
+  // ヘッダーの「使い方」ボタン・モバイル下部タブの「使い方」・初回自動表示のいずれからも
+  // この共有stateを介してモーダル表示をトリガーする。
+  guideOpen: boolean;
 
   // projects
   createProject: (title: string, question: string) => Project;
@@ -64,11 +68,15 @@ interface HiramekiState {
     role: ChatMessage["role"],
     content: string,
     stage: Stage,
+    options?: { auto?: boolean },
   ) => ChatMessage;
   setStreaming: (streaming: boolean) => void;
 
   // settings (T9: BYOK)
   updateSettings: (partial: Partial<Settings>) => void;
+
+  // T13: 使い方ガイド
+  setGuideOpen: (open: boolean) => void;
 }
 
 export const useHiramekiStore = create<HiramekiState>((set, get) => ({
@@ -80,6 +88,7 @@ export const useHiramekiStore = create<HiramekiState>((set, get) => ({
   messages: messagesRepo.load(),
   streaming: false,
   settings: settingsRepo.load(),
+  guideOpen: false,
 
   createProject: (title, question) => {
     const project: Project = {
@@ -210,7 +219,7 @@ export const useHiramekiStore = create<HiramekiState>((set, get) => ({
     set({ sparks });
   },
 
-  addMessage: (projectId, role, content, stage) => {
+  addMessage: (projectId, role, content, stage, options) => {
     const message: ChatMessage = {
       id: newId(),
       projectId,
@@ -218,6 +227,7 @@ export const useHiramekiStore = create<HiramekiState>((set, get) => ({
       content,
       stage,
       createdAt: nowIso(),
+      ...(options?.auto ? { auto: true } : {}),
     };
     const messages = trimMessagesPerProject([...get().messages, message]);
     messagesRepo.save(messages);
@@ -232,4 +242,6 @@ export const useHiramekiStore = create<HiramekiState>((set, get) => ({
     settingsRepo.save(settings);
     set({ settings });
   },
+
+  setGuideOpen: (open) => set({ guideOpen: open }),
 }));

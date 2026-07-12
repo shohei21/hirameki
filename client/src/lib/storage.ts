@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   Settings,
   HiramekiModel,
+  ResponseEffort,
 } from "../types";
 
 export const SCHEMA_VERSION = 1;
@@ -17,19 +18,34 @@ const STORAGE_PREFIX = "hirameki:v1:";
 const MAX_MESSAGES_PER_PROJECT = 500;
 
 const DEFAULT_MODEL: HiramekiModel = "claude-opus-4-8";
-const DEFAULT_SETTINGS: Settings = { apiKey: "", model: DEFAULT_MODEL };
+// T13: effortのデフォルトは'low'(会話用途では速く・安く・十分な品質)。
+const DEFAULT_EFFORT: ResponseEffort = "low";
+const DEFAULT_SETTINGS: Settings = {
+  apiKey: "",
+  model: DEFAULT_MODEL,
+  effort: DEFAULT_EFFORT,
+};
 
 function isHiramekiModel(value: unknown): value is HiramekiModel {
   return value === "claude-opus-4-8" || value === "claude-sonnet-5";
 }
 
-/** 破損・旧形式のsettingsでも安全なデフォルトへフォールバックする。 */
+function isResponseEffort(value: unknown): value is ResponseEffort {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+/**
+ * 破損・旧形式のsettingsでも安全なデフォルトへフォールバックする。
+ * T13: 既存保存データに effort が無い場合(Phase5以前に保存されたsettings)は
+ * 後方互換のため 'low' 扱いにする。
+ */
 function sanitizeSettings(value: unknown): Settings {
   if (typeof value !== "object" || value === null) return DEFAULT_SETTINGS;
   const v = value as Record<string, unknown>;
   return {
     apiKey: typeof v["apiKey"] === "string" ? v["apiKey"] : "",
     model: isHiramekiModel(v["model"]) ? v["model"] : DEFAULT_MODEL,
+    effort: isResponseEffort(v["effort"]) ? v["effort"] : DEFAULT_EFFORT,
   };
 }
 
@@ -152,4 +168,11 @@ export const activeProjectRepo = {
 export const settingsRepo = {
   load: (): Settings => sanitizeSettings(loadEntity<unknown>("settings", DEFAULT_SETTINGS)),
   save: (settings: Settings): void => saveEntity<Settings>("settings", settings),
+};
+
+// T13: 使い方ガイドを一度でも表示したかどうかのフラグ。
+// 「初回起動時(プロジェクト0件かつ未読フラグなし)は自動でガイドを表示」の判定に使う。
+export const guideSeenRepo = {
+  load: (): boolean => loadEntity<boolean>("guideSeen", false),
+  save: (seen: boolean): void => saveEntity<boolean>("guideSeen", seen),
 };

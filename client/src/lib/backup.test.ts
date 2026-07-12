@@ -99,14 +99,14 @@ describe("buildBackup / validateBackup round-trip", () => {
   });
 
   it("settings(APIキー)はバックアップに含まれない", () => {
-    settingsRepo.save({ apiKey: "sk-ant-secret", model: "claude-opus-4-8" });
+    settingsRepo.save({ apiKey: "sk-ant-secret", model: "claude-opus-4-8", effort: "low" });
     const backup = buildBackup();
     expect(JSON.stringify(backup)).not.toContain("sk-ant-secret");
     expect("settings" in backup).toBe(false);
   });
 
   it("applyBackupでlocalStorageの内容が上書きされる(settingsは触らない)", () => {
-    settingsRepo.save({ apiKey: "sk-ant-should-survive", model: "claude-opus-4-8" });
+    settingsRepo.save({ apiKey: "sk-ant-should-survive", model: "claude-opus-4-8", effort: "low" });
     const project = makeProject({ id: "new-project" });
     applyBackup({
       schemaVersion: 1,

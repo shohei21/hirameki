@@ -3,7 +3,13 @@
 // DESIGN.md §4/§6 のプロンプト・リクエスト仕様を維持したまま、SDKを `new Anthropic({apiKey, dangerouslyAllowBrowser: true})` で直接呼ぶ。
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { ChatMessage, MaterialCard, Stage, HiramekiModel } from "../types";
+import type {
+  ChatMessage,
+  MaterialCard,
+  Stage,
+  HiramekiModel,
+  ResponseEffort,
+} from "../types";
 import { SYSTEM_BLOCK_1, buildContext } from "./prompts";
 
 export interface ChatRequestMessage {
@@ -78,6 +84,21 @@ export function buildChatMessages(messages: ChatMessage[]): ChatRequestMessage[]
   return sorted.slice(cutIndex).map((m) => ({ role: m.role, content: m.content }));
 }
 
+const CONTINUATION_TAIL_LENGTH = 80;
+
+/**
+ * T13(中断対策c): 「続きから再開」ボタンが自動送信するuserターンの文面を組み立てる。
+ * assistantプレフィルはこのモデルでは400になるため使わず、直前までの部分応答の末尾を
+ * 引用して「そこから続きだけを書いて」と指示するuserターンで再開する。
+ */
+export function buildContinuationPrompt(partialText: string): string {
+  const tail =
+    partialText.length > CONTINUATION_TAIL_LENGTH
+      ? partialText.slice(-CONTINUATION_TAIL_LENGTH)
+      : partialText;
+  return `あなたの直前の返答は途中で中断されました。最後は「${tail}」で終わっています。そこから続きだけを書いてください。`;
+}
+
 /** 素材カードを最大 MAX_CONTEXT_CARDS 件(新しい順)にクライアント側で切る。 */
 export function selectRecentCards(cards: MaterialCard[]): ChatCardInput[] {
   const sorted = [...cards].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -125,10 +146,15 @@ function formatAnthropicError(err: unknown): string {
 /**
  * チャット送信。client.messages.stream() + thinking:adaptive + systemブロックへの
  * cache_control で DESIGN.md §4 の仕様を維持する。temperature/budget_tokens は使わない。
+ *
+ * T13(中断対策a): output_config.effort に settings.effort をそのまま渡す(有効値
+ * low/medium/high。budget_tokens/temperatureはこのモデルでは400になるため使わない)。
+ * max_tokens は thinking が枠を食って途切れるのを防ぐため 8192 に引き上げている。
  */
 export async function streamChat(
   apiKey: string,
   model: HiramekiModel,
+  effort: ResponseEffort,
   payload: ChatRequestPayload,
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
@@ -164,8 +190,9 @@ export async function streamChat(
     const stream = client.messages.stream(
       {
         model,
-        max_tokens: 4096,
+        max_tokens: 8192,
         thinking: { type: "adaptive" },
+        output_config: { effort },
         system: [
           {
             type: "text",

@@ -46,13 +46,20 @@ export interface ChatMessage {
   content: string;
   stage: Stage; // 発言時のステージ
   createdAt: string;
+  // T13 (中断対策c): 「続きから再開」ボタンが自動送信した継続指示のuserターンには
+  // auto:true を付ける。履歴には保存するが、UI表示は簡略化する目印として使う。
+  auto?: boolean;
 }
 
 // T9 (BYOK化): ユーザーが設定画面で入力するAPIキー・モデル選択。
 // localStorage `hirameki:v1:settings` にのみ保存され、この端末以外へは送信されない。
 export type HiramekiModel = "claude-opus-4-8" | "claude-sonnet-5";
 
+// T13 (中断対策a): chatの output_config.effort。デフォルトは'low'(速く・安く・十分な品質)。
+export type ResponseEffort = "low" | "medium" | "high";
+
 export interface Settings {
   apiKey: string;
   model: HiramekiModel;
+  effort: ResponseEffort;
 }

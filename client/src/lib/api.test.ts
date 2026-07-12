@@ -59,7 +59,8 @@ interface MockAnthropicStatics {
 }
 const Anthropic = (await import("@anthropic-ai/sdk"))
   .default as unknown as MockAnthropicStatics;
-const { buildChatMessages, streamChat, extractCards } = await import("./api");
+const { buildChatMessages, streamChat, extractCards, buildContinuationPrompt } =
+  await import("./api");
 
 afterEach(() => {
   mockState.streamError = null;
@@ -175,7 +176,7 @@ const BASE_PAYLOAD = {
 describe("streamChat (BYOK: SDK直呼び)", () => {
   it("APIキー未設定なら SDK を呼ばずに onError('no_api_key')", async () => {
     const onError = vi.fn();
-    await streamChat("", "claude-opus-4-8", BASE_PAYLOAD, {
+    await streamChat("", "claude-opus-4-8", "low", BASE_PAYLOAD, {
       onDelta: vi.fn(),
       onDone: vi.fn(),
       onError,
@@ -185,7 +186,7 @@ describe("streamChat (BYOK: SDK直呼び)", () => {
 
   it("無効なAPIキー(401 AuthenticationError)は「APIキーが無効です」に分岐する", async () => {
     const onError = vi.fn();
-    await streamChat("sk-ant-invalid", "claude-opus-4-8", BASE_PAYLOAD, {
+    await streamChat("sk-ant-invalid", "claude-opus-4-8", "low", BASE_PAYLOAD, {
       onDelta: vi.fn(),
       onDone: vi.fn(),
       onError,
@@ -199,7 +200,7 @@ describe("streamChat (BYOK: SDK直呼び)", () => {
       400,
     );
     const onError = vi.fn();
-    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+    await streamChat("sk-ant-valid", "claude-opus-4-8", "low", BASE_PAYLOAD, {
       onDelta: vi.fn(),
       onDone: vi.fn(),
       onError,
@@ -215,7 +216,7 @@ describe("streamChat (BYOK: SDK直呼び)", () => {
       400,
     );
     const onError = vi.fn();
-    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+    await streamChat("sk-ant-valid", "claude-opus-4-8", "low", BASE_PAYLOAD, {
       onDelta: vi.fn(),
       onDone: vi.fn(),
       onError,
@@ -228,7 +229,7 @@ describe("streamChat (BYOK: SDK直呼び)", () => {
   it("APIConnectionErrorはネットワーク不通の案内文に分岐する", async () => {
     mockState.streamError = new Anthropic.APIConnectionError({ message: "fetch failed" });
     const onError = vi.fn();
-    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+    await streamChat("sk-ant-valid", "claude-opus-4-8", "low", BASE_PAYLOAD, {
       onDelta: vi.fn(),
       onDone: vi.fn(),
       onError,
@@ -253,5 +254,32 @@ describe("extractCards (BYOK: SDK直呼び)", () => {
       ok: false,
       error: "レート制限。少し待って再送してください",
     });
+  });
+});
+
+describe("buildContinuationPrompt (T13: 中断対策c 継続プロンプト組み立て)", () => {
+  it("80文字以下の部分応答はそのまま末尾として引用する", () => {
+    const prompt = buildContinuationPrompt("こんにちは、これは短い部分応答です。");
+    expect(prompt).toBe(
+      "あなたの直前の返答は途中で中断されました。最後は「こんにちは、これは短い部分応答です。」で終わっています。そこから続きだけを書いてください。",
+    );
+  });
+
+  it("80文字を超える部分応答は末尾80文字だけを引用する", () => {
+    const partial = "あ".repeat(120);
+    const prompt = buildContinuationPrompt(partial);
+    const expectedTail = "あ".repeat(80);
+    expect(prompt).toBe(
+      `あなたの直前の返答は途中で中断されました。最後は「${expectedTail}」で終わっています。そこから続きだけを書いてください。`,
+    );
+    // 末尾80文字ちょうどであることも確認
+    expect(expectedTail).toHaveLength(80);
+  });
+
+  it("空文字列でもエラーにならず、空の引用として組み立てる", () => {
+    const prompt = buildContinuationPrompt("");
+    expect(prompt).toBe(
+      "あなたの直前の返答は途中で中断されました。最後は「」で終わっています。そこから続きだけを書いてください。",
+    );
   });
 });

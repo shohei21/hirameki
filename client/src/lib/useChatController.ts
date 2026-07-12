@@ -8,6 +8,7 @@ import type { Project } from "../types";
 import { useHiramekiStore } from "../store";
 import {
   buildChatMessages,
+  buildContinuationPrompt,
   extractCards,
   selectRecentCards,
   streamChat,
@@ -24,9 +25,11 @@ export interface ChatController {
   sending: boolean;
   streamingText: string;
   errorMessage: string | null;
-  canResend: boolean;
+  // T13(中断対策c): エラーによる中断・max_tokensによる一区切りのどちらでも、
+  // 直前までの部分応答から「続きから再開」できる状態かどうか。
+  canContinue: boolean;
   sendMessage: (text: string) => void;
-  resend: () => void;
+  continueFromInterruption: () => void;
   candidates: ExtractedCard[];
   extracting: boolean;
   extractError: string | null;
@@ -34,6 +37,10 @@ export interface ChatController {
   approveCandidate: (index: number) => void;
   discardCandidate: (index: number) => void;
 }
+
+/** T13(中断対策c): 中断/一区切りの種別に応じたメッセージ末尾の注記。 */
+const INTERRUPTED_NOTE = "(中断されました)";
+const MAX_TOKENS_NOTE = "(長くなったため一区切りしました)";
 
 export function useChatController(project: Project | null): ChatController {
   const messages = useHiramekiStore((s) => s.messages);
@@ -53,12 +60,16 @@ export function useChatController(project: Project | null): ChatController {
 
   const [streamingText, setStreamingText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [canContinue, setCanContinue] = useState(false);
   const [candidates, setCandidates] = useState<ExtractedCard[]>([]);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
 
   const streamBufferRef = useRef("");
   const lastUserTextRef = useRef<string | null>(null);
+  // T13(中断対策c): 中断/一区切り時点の「生の」部分応答(注記文言を含まない)。
+  // 「続きから再開」の際、この末尾80文字を引用したuserターンを組み立てる。
+  const lastInterruptedPartialRef = useRef<string>("");
 
   const projectId = project?.id ?? null;
 
@@ -67,21 +78,69 @@ export function useChatController(project: Project | null): ChatController {
     setCandidates([]);
     setExtractError(null);
     setErrorMessage(null);
+    setCanContinue(false);
     streamBufferRef.current = "";
     setStreamingText("");
     lastUserTextRef.current = null;
+    lastInterruptedPartialRef.current = "";
   }, [projectId]);
 
+  // T13(中断対策b): ストリーミング中は画面消灯を防止する。非対応ブラウザ(iOS旧版等)では
+  // navigator.wakeLock 自体が存在しないかrequestが例外を投げるため、try/catchで無視する。
+  // done/error(=streamingがfalseになる)や、タブが非表示になった瞬間にも確実にreleaseする。
+  useEffect(() => {
+    if (!streaming) return;
+
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    async function acquire(): Promise<void> {
+      try {
+        const lock = await navigator.wakeLock?.request("screen");
+        if (cancelled) {
+          // acquire完了までの間にstreamingがfalseになっていたら即release
+          void lock?.release().catch(() => undefined);
+          return;
+        }
+        sentinel = lock ?? null;
+      } catch {
+        // 非対応・拒否は黙って無視する
+        sentinel = null;
+      }
+    }
+
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === "hidden") {
+        void sentinel?.release().catch(() => undefined);
+        sentinel = null;
+      } else if (!cancelled) {
+        void acquire();
+      }
+    }
+
+    void acquire();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void sentinel?.release().catch(() => undefined);
+      sentinel = null;
+    };
+  }, [streaming]);
+
   const runSend = useCallback(
-    (text: string) => {
+    (text: string, options?: { auto?: boolean }) => {
       if (!project) return;
       const trimmed = text.trim();
       if (trimmed.length === 0) return;
       if (!health.hasApiKey) return;
 
       lastUserTextRef.current = trimmed;
-      addMessage(project.id, "user", trimmed, project.stage);
+      addMessage(project.id, "user", trimmed, project.stage, options);
       setErrorMessage(null);
+      setCanContinue(false);
+      lastInterruptedPartialRef.current = "";
       setStreaming(true);
       streamBufferRef.current = "";
       setStreamingText("");
@@ -111,14 +170,27 @@ export function useChatController(project: Project | null): ChatController {
         messages: buildChatMessages(projectMessages),
       };
 
-      void streamChat(settings.apiKey, settings.model, payload, {
+      void streamChat(settings.apiKey, settings.model, settings.effort, payload, {
         onDelta: (delta) => {
           streamBufferRef.current += delta;
           setStreamingText(streamBufferRef.current);
         },
-        onDone: () => {
+        onDone: (stopReason) => {
           const finalText = streamBufferRef.current;
-          if (finalText.length > 0) {
+          if (stopReason === "max_tokens") {
+            // T13(中断対策c): max_tokensで終わった場合も「続きから再開」を出す。
+            // エラーではないので errorMessage は立てない。
+            lastInterruptedPartialRef.current = finalText;
+            if (finalText.length > 0) {
+              addMessage(
+                project.id,
+                "assistant",
+                `${finalText}\n\n${MAX_TOKENS_NOTE}`,
+                project.stage,
+              );
+            }
+            setCanContinue(true);
+          } else if (finalText.length > 0) {
             addMessage(project.id, "assistant", finalText, project.stage);
           }
           streamBufferRef.current = "";
@@ -127,11 +199,12 @@ export function useChatController(project: Project | null): ChatController {
         },
         onError: (message) => {
           const partial = streamBufferRef.current;
+          lastInterruptedPartialRef.current = partial;
           if (partial.length > 0) {
             addMessage(
               project.id,
               "assistant",
-              `${partial}\n\n(中断されました)`,
+              `${partial}\n\n${INTERRUPTED_NOTE}`,
               project.stage,
             );
           }
@@ -139,6 +212,7 @@ export function useChatController(project: Project | null): ChatController {
           setStreamingText("");
           setStreaming(false);
           setErrorMessage(message);
+          setCanContinue(true);
         },
       });
     },
@@ -157,9 +231,20 @@ export function useChatController(project: Project | null): ChatController {
 
   const sendMessage = useCallback((text: string) => runSend(text), [runSend]);
 
-  const resend = useCallback(() => {
+  /**
+   * T13(中断対策c): 「続きから再開」。assistantプレフィルは使わず、直前までの部分応答の
+   * 末尾80文字を引用した継続指示のuserターンを自動送信する(履歴には auto:true 付きで保存)。
+   * 部分応答が全く無い場合(APIキー無効など、ストリーミング開始前の失敗)は、続ける対象が
+   * ないため直前のユーザー発言をそのまま再送する。
+   */
+  const continueFromInterruption = useCallback(() => {
+    const partial = lastInterruptedPartialRef.current;
+    if (partial.length > 0) {
+      runSend(buildContinuationPrompt(partial), { auto: true });
+      return;
+    }
     const last = lastUserTextRef.current;
-    if (last) runSend(last);
+    if (last) runSend(last, { auto: true });
   }, [runSend]);
 
   const runExtract = useCallback(() => {
@@ -204,9 +289,9 @@ export function useChatController(project: Project | null): ChatController {
     sending: streaming,
     streamingText,
     errorMessage,
-    canResend: errorMessage !== null && lastUserTextRef.current !== null,
+    canContinue,
     sendMessage,
-    resend,
+    continueFromInterruption,
     candidates,
     extracting,
     extractError,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Project } from "../types";
 import { useHiramekiStore } from "../store";
 import type { ChatController } from "../lib/useChatController";
+import { computeAutoRows } from "../lib/autosize";
 
 interface ChatProps {
   project: Project;
@@ -46,8 +47,13 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
           </p>
         )}
         {projectMessages.map((m) => (
-          <div key={m.id} className={`chat-bubble chat-bubble--${m.role}`}>
-            <p>{m.content}</p>
+          <div
+            key={m.id}
+            className={`chat-bubble chat-bubble--${m.role}${m.auto ? " chat-bubble--auto" : ""}`}
+          >
+            {/* T13(中断対策c): 自動送信した継続指示のuserターンは、生の指示文をそのまま
+                見せるとうるさいため、簡略化したラベルで表示する(履歴には全文を保存済み) */}
+            <p>{m.auto ? "続きから再開しました" : m.content}</p>
           </div>
         ))}
         {controller.streamingText.length > 0 && (
@@ -69,11 +75,14 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
       {controller.errorMessage && (
         <div className="chat-error">
           <span>エラー: {controller.errorMessage}</span>
-          {controller.canResend && (
-            <button type="button" onClick={controller.resend}>
-              再送
-            </button>
-          )}
+        </div>
+      )}
+
+      {controller.canContinue && (
+        <div className="chat-continue">
+          <button type="button" onClick={controller.continueFromInterruption}>
+            続きから再開
+          </button>
         </div>
       )}
 
@@ -98,7 +107,8 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
           onChange={(e) => setDraft(e.target.value)}
           placeholder={hasApiKey ? "botに話しかける..." : "APIキー未設定のため送信できません"}
           disabled={!hasApiKey || controller.sending}
-          rows={2}
+          // T13: 1行の高さから内容に応じて自動拡張(最大5行、それ以上は内部スクロール)
+          rows={computeAutoRows(draft)}
         />
         <div className="chat-input-actions">
           <button

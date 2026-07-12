@@ -2,7 +2,7 @@
 // T12: データのエクスポート/インポートもここに追加(settings=APIキーは対象外)。
 import { useRef, useState, type ChangeEvent } from "react";
 import { useHiramekiStore } from "../store";
-import type { HiramekiModel } from "../types";
+import type { HiramekiModel, ResponseEffort } from "../types";
 import { buildBackup, downloadBackup, validateBackup, applyBackup } from "../lib/backup";
 
 interface SettingsModalProps {
@@ -15,11 +15,12 @@ export default function SettingsModal({ onClose }: SettingsModalProps): JSX.Elem
 
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState<HiramekiModel>(settings.model);
+  const [effort, setEffort] = useState<ResponseEffort>(settings.effort);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleSave(): void {
-    updateSettings({ apiKey: apiKey.trim(), model });
+    updateSettings({ apiKey: apiKey.trim(), model, effort });
     onClose();
   }
 
@@ -92,6 +93,20 @@ export default function SettingsModal({ onClose }: SettingsModalProps): JSX.Elem
             <option value="claude-sonnet-5">claude-sonnet-5</option>
           </select>
         </label>
+        <label>
+          応答の速さ/深さ
+          <select
+            value={effort}
+            onChange={(e) => setEffort(e.target.value as ResponseEffort)}
+          >
+            <option value="low">low = 速い(推奨)</option>
+            <option value="medium">medium = バランス</option>
+            <option value="high">high = じっくり</option>
+          </select>
+        </label>
+        <p className="settings-note">
+          会話は基本的に速さ優先(low)がおすすめです。じっくり考えてほしいときだけ上げてください。応答が長くなるほど途中で一区切りされやすくなります。
+        </p>
 
         <div className="settings-backup">
           <h3>データのバックアップ</h3>

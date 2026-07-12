@@ -138,3 +138,33 @@ APIキーは各ユーザーが設定画面で入力し、その端末のlocalSto
 | Task | 状態 | 備考 |
 |------|------|------|
 | T12 | 完了 | client/src/lib/api.ts: formatAnthropicErrorにBadRequestError(クレジット残高不足はmessage部分一致、他は「リクエストエラー: 」+message)とAPIConnectionErrorの分岐を追加。client/src/styles.css: .chat-error/.chat-extract-errorにword-break/max-height+overflow-yを追加し長文JSONで溢れないようにした。900px未満のメディアクエリにinput/textarea/selectのfont-size:16px統一ルールを追加(user-scalable=noは使わず)。Chat.tsxはtextareaにrefを追加し、モバイル幅では送信後にblurして画面が寄ったままにならないようにした。データのエクスポート/インポートはclient/src/lib/backup.ts(buildBackup/downloadBackup/validateBackup/applyBackup、settingsは対象外)を新設しSettingsModal.tsxに「データのバックアップ」セクションとして追加(エクスポート即ダウンロード、インポートはファイル選択→schemaVersion含む構造検証→window.confirmで上書き確認→保存→リロード)。vitest: api.test.tsにBadRequestError(クレジット残高不足/その他)・APIConnectionErrorの3分岐テストを追加(vi.hoistedでエラーを差し替え可能なモックに変更)、backup.test.tsを新規追加(round-trip・settings非混入・不正データ拒否)。typecheck/test(26件)/build すべてgreen。Playwright(NODE_PATH=planet-messenger, .cjs, port 5184)で375px幅の検証: チャット入力欄・素材カード追加欄・設定モーダルのAPIキー欄/モデルselectすべてfont-size 16px、設定モーダルに「データのバックアップ」見出し+エクスポート/インポートボタンが表示されることを確認。スクリーンショットをdocs/screenshots/mobile-07-chat-input.png, mobile-08-workbench-input.png, mobile-09-settings-backup.pngに保存 |
+
+## Phase 6: 使い方ガイド・入力欄・中断対策
+
+### T13 使い方ガイド + 入力欄コンパクト化 + 中断対策
+背景: スマホ実使用フィードバック第2弾。「タブの使い方が分からない」「入力欄が大きく見切れる」「返事が頻繁に中断され、続けての指示に金がかかる」。
+
+1. **使い方ガイド**:
+   - モバイル下部タブに「使い方」を追加(4タブ目)。PC幅ではヘッダーに「使い方」ボタン→同内容をモーダル表示
+   - 初回起動時(プロジェクト0件かつ未読フラグなし)は自動でガイドを表示
+   - 内容は以下を**このまま**掲載(見出し+短文+絵文字可、スクロール可能な1画面):
+     - 「Hiramekiの考え方: アイデアとは既存の要素の新しい組み合わせ。5つの工程をこの順に回します。」
+     - ① 収集 — チャットでbotと話す。出てきた事実は「素材を抽出」ボタンか、ワークベンチで手動でカード化。特殊資料=課題に直接関係する事実、一般資料=無関係だけど面白かったこと。10枚たまったら次の工程へ。
+     - ② 咀嚼 — ワークベンチでカードを2枚以上選んで「botに相談」。つながりを感じたら組み合わせメモに残す。「もう何も出ない」と疲れたら、それが完了の合図。
+     - ③ 孵化 — アプリを閉じて散歩や音楽を。考えないことが仕事。期限を設定すると再訪時に声がかかる。
+     - ④ 誕生 — 閃いたら右下の「+閃きを記録」ですぐメモ。
+     - ⑤ 検証 — 閃きをチャットでbotと一緒に磨いて現実に使える形へ。
+     - 「タブの役割: ステージ=今どの工程にいるかの切替 / チャット=botとの対話 / ワークベンチ=素材の保管庫」
+2. **チャット入力欄のコンパクト化**: textarea を1行の高さから内容に応じて自動拡張(最大5行、それ以上は内部スクロール)。モバイルの固定フッターの余白も詰めて、ズーム時にも見切れにくくする
+3. **中断対策(3段構え)**:
+   - a) **応答の高速化**: chat呼び出しに `output_config: { effort: settings.effort }` を追加。Settings型に `effort: 'low'|'medium'|'high'` を追加、**デフォルト'low'**(会話用途では速く・安く・十分な品質)。設定モーダルに「応答の速さ/深さ」として選択UI(low=速い(推奨)/medium=バランス/high=じっくり)。`max_tokens` は 4096→8192 に引き上げ(thinkingが枠を食って途切れるのを防ぐ)
+   - b) **Wake Lock**: ストリーミング中は `navigator.wakeLock?.request('screen')` で画面消灯を防止(非対応ブラウザでは黙ってスキップ)。done/error/visibilitychange解放時にrelease
+   - c) **「続きから再開」ボタン**: 中断時(エラー時)にメッセージ末尾へ表示する操作を「再送」から「続きから再開」に変更。押すと、直前までの部分応答テキストを用いて「あなたの直前の返答は途中で中断されました。最後は「(末尾80文字)」で終わっています。そこから続きだけを書いてください。」というuserターンを自動送信する(assistantプレフィルはこのモデルでは400になるため使わない)。部分応答は履歴にassistantメッセージとして保存した上で継続する
+   - stopReason==='max_tokens' で終わった場合も同じ「続きから再開」ボタンを表示(この場合は「(中断されました)」ではなく「(長くなったため一区切りしました)」と表示)
+- **AC**: typecheck/test/build green。effort設定round-trip・継続プロンプト組み立て・自動拡張ロジックの単体テスト。Playwright 375pxで: 使い方タブの表示、入力欄が1行高で始まり入力で拡張されること、初回ガイド自動表示のスクリーンショット
+
+## 進捗(Phase 6)
+
+| Task | 状態 | 備考 |
+|------|------|------|
+| T13 | 完了 | **使い方ガイド**: client/src/components/GuideModal.tsx新設(タスクカード記載の文言をそのまま掲載)。store.tsに`guideOpen`(エフェメラル)を追加しProjectHeader/App.tsx/mobile-tabbarから共有。storage.tsに`guideSeenRepo`を追加し、App.tsxのマウント時useEffectで「プロジェクト0件かつ未読フラグなし」を判定して自動表示+即座にguideSeen=true保存。PC幅はProjectHeaderの「使い方」ボタン、モバイルは下部タブバー4個目の「使い方」ボタンから同じモーダルを開く。**入力欄コンパクト化**: client/src/lib/autosize.ts新設(`computeAutoRows`、改行数+概算折り返し幅から1〜5行を決定論的に算出、jsdom非依存でテスト容易)。Chat.tsxのtextareaに`rows={computeAutoRows(draft)}`を適用、CSSは`resize:none`+`overflow-y:auto`で最大5行超は内部スクロール。モバイル固定フッターの padding/gap も詰めた。**中断対策3段構え**: a)types.tsに`ResponseEffort`追加、Settingsに`effort`(デフォルト'low')。storage.tsのsanitizeSettingsで後方互換(旧settingsにeffort無しなら'low')。api.tsのstreamChatに`effort`引数を追加し`output_config:{effort}`をSDKへ渡す(SDK v0.110.0のOutputConfig型で確認済み)。max_tokens 4096→8192。SettingsModal.tsxに「応答の速さ/深さ」select(low=速い(推奨)/medium=バランス/high=じっくり)を追加。b)useChatController.tsにWake Lock用useEffect追加。`streaming`をdepsにして`navigator.wakeLock?.request('screen')`をtry/catchで包み、非対応環境は無視。visibilitychangeでrelease/再acquireし、effect cleanup(done/error/unmount全て)で必ずrelease。c)「続きから再開」: api.tsに`buildContinuationPrompt(partialText)`を新設(末尾80文字を引用した定型指示文を組み立てる純関数)。useChatControllerのonError/onDone(stopReason==='max_tokens')の両方で`canContinue`をtrueにし、部分応答をassistantメッセージとして保存(中断時は「(中断されました)」、max_tokens時は「(長くなったため一区切りしました)」を末尾に付与)。「続きから再開」ボタン押下でbuildContinuationPromptによる継続指示のuserターンを`auto:true`付きで自動送信(assistantプレフィルは使わない)。types.tsのChatMessageに`auto?: boolean`を追加、Chat.tsxはauto:trueのメッセージを簡略化した小さいラベル表示にする(履歴には全文保存)。**検証**: typecheck/test(41件、内訳: buildContinuationPrompt 3件・computeAutoRows 6件・settingsRepo effort round-trip/後方互換 4件・guideSeenRepo 2件を新規追加)/build すべてgreen。Playwright(NODE_PATH=planet-messenger, .cjs, port 5184, 実API呼び出しなし)で375px幅: 初回ガイド自動表示(mobile-10)・2回目以降は自動表示されないことの確認・モバイル下部タブ「使い方」からのモーダル再表示(mobile-11)・入力欄1行高(mobile-12)・複数行入力での自動拡張と最大5行クランプ(mobile-13)を確認。さらにボーナス検証として、Anthropic APIへのリクエストをネットワークレベルでabortして実際には送信させず、それによる接続エラーで「続きから再開」ボタンが表示されクリックで`auto:true`の継続ターンが追加されること、ストリーミング中に`navigator.wakeLock.request`が実際に呼ばれることをスパイで確認(mobile-14, mobile-15)。PC幅(1280px)ではヘッダーの「使い方」ボタン→モーダル表示を確認(desktop-1280-guide-modal.png)。**独自判断点**: (1)「続きから再開」ボタンは中断時のerrorMessageバナーとは別のUI領域(`.chat-continue`)に分離し、max_tokens正常終了時にも赤系エラー色を出さないようにした。(2)自動継続userターンの表示は、生の継続指示文(長い定型文)をそのまま見せるとうるさいため「続きから再開しました」という簡略ラベルに置き換えて表示し、API送信用の全文は`ChatMessage.content`に保存したまま(見た目のみ簡略化)。(3)モバイル下部タブの「使い方」は他の3タブ(ステージ/チャット/ワークベンチ)と異なり画面切替ではなくモーダルを開く単発アクションのため、is-activeクラスは付与していない。(4)partial応答が空(ストリーミング開始前に失敗した場合)は継続指示文が空引用になり不自然なため、その場合のみ直前のユーザー発言をそのまま再送するフォールバックにした。 |

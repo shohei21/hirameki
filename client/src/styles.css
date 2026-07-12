@@ -59,6 +59,32 @@ body {
   margin: 0;
 }
 
+.settings-backup {
+  border-top: 1px solid #e4dcc8;
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-backup h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.settings-backup__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-backup__error {
+  color: #9c3b2e;
+  font-size: 0.8rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .empty-state {
   padding: 2rem;
   background: #fffdf8;
@@ -219,10 +245,19 @@ body {
 
 .chat-error {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   color: #9c3b2e;
   font-size: 0.85rem;
+}
+
+.chat-error span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-height: 6rem;
+  overflow-y: auto;
 }
 
 .chat-setup-card {
@@ -262,6 +297,10 @@ body {
 .chat-extract-error {
   color: #9c3b2e;
   font-size: 0.85rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-height: 6rem;
+  overflow-y: auto;
 }
 
 .incubate-banner {
@@ -504,6 +543,15 @@ body {
     margin: 0 auto;
     padding: 0.75rem 0.75rem
       calc(64px + env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  /* T12: iOS Safariはinput/textarea/selectのfont-sizeが16px未満だと
+     フォーカス時に自動ズームする。全フォーム要素で16px以上に統一する。
+     (viewportメタへの user-scalable=no は使わない) */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
   }
 
   .app-header {

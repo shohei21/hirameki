@@ -90,13 +90,28 @@ function buildClient(apiKey: string): Anthropic {
   return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 }
 
-/** SDKの型付き例外で分岐する(文字列マッチは禁止)。 */
+/**
+ * SDKの型付き例外で分岐する(文字列マッチは禁止)。
+ *
+ * T12: 唯一の例外として、Anthropicのクレジット残高不足はAPIが専用のエラー種別を
+ * 用意しておらず BadRequestError(400) の message でしか判別できないため、
+ * ここに限り型付き例外 + message の部分一致で判定する(タスクカード記載の理由による)。
+ */
 function formatAnthropicError(err: unknown): string {
   if (err instanceof Anthropic.AuthenticationError) {
     return "APIキーが無効です";
   }
   if (err instanceof Anthropic.RateLimitError) {
     return "レート制限。少し待って再送してください";
+  }
+  if (err instanceof Anthropic.BadRequestError) {
+    if (err.message.includes("credit balance is too low")) {
+      return "Anthropicのクレジット残高が不足しています。console.anthropic.com の Plans & Billing でクレジットを購入してください(APIキー自体は有効です)";
+    }
+    return `リクエストエラー: ${err.message}`;
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return "ネットワークに接続できません。電波状況を確認して再送してください";
   }
   if (err instanceof Anthropic.APIError) {
     return `${err.status ?? "unknown"}: ${err.message}`;

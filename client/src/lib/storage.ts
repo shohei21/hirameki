@@ -12,7 +12,7 @@ import type {
   HiramekiModel,
 } from "../types";
 
-const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 1;
 const STORAGE_PREFIX = "hirameki:v1:";
 const MAX_MESSAGES_PER_PROJECT = 500;
 

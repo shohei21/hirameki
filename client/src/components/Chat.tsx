@@ -16,6 +16,7 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
 
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -29,6 +30,11 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
     if (!hasApiKey || controller.sending) return;
     controller.sendMessage(draft);
     setDraft("");
+    // T12: スマホでフォーカスが残ったままだと画面がズームしたまま寄って
+    // 戻らないことがあるため、送信後は明示的にblurして画面位置をリセットする。
+    if (window.matchMedia("(max-width: 899px)").matches) {
+      textareaRef.current?.blur();
+    }
   }
 
   return (
@@ -87,6 +93,7 @@ export default function Chat({ project, controller }: ChatProps): JSX.Element {
 
       <form className="chat-input-row" onSubmit={handleSubmit}>
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={hasApiKey ? "botに話しかける..." : "APIキー未設定のため送信できません"}

@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "../types";
 
 // T9 (BYOK化): SDKを直接呼ぶため、@anthropic-ai/sdk をモックしてキー未設定・401(無効キー)・
 // 429(レート制限)分岐を型付き例外ベースで検証する。
+// T12: mockState 経由で stream/create が投げる例外をテストごとに差し替え、
+// BadRequestError(クレジット残高不足/その他)・APIConnectionError の分岐も検証する。
+const mockState = vi.hoisted(() => ({
+  streamError: null as Error | null,
+  createError: null as Error | null,
+}));
+
 vi.mock("@anthropic-ai/sdk", () => {
   class APIError extends Error {
     status?: number;
@@ -13,11 +20,15 @@ vi.mock("@anthropic-ai/sdk", () => {
   }
   class AuthenticationError extends APIError {}
   class RateLimitError extends APIError {}
+  class BadRequestError extends APIError {}
+  class APIConnectionError extends APIError {}
 
   class MockAnthropic {
     static APIError = APIError;
     static AuthenticationError = AuthenticationError;
     static RateLimitError = RateLimitError;
+    static BadRequestError = BadRequestError;
+    static APIConnectionError = APIConnectionError;
     messages: {
       stream: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
@@ -25,10 +36,12 @@ vi.mock("@anthropic-ai/sdk", () => {
     constructor() {
       this.messages = {
         stream: vi.fn(() => {
-          throw new AuthenticationError("invalid x-api-key", 401);
+          throw mockState.streamError ?? new AuthenticationError("invalid x-api-key", 401);
         }),
         create: vi.fn(() =>
-          Promise.reject(new RateLimitError("rate limited", 429)),
+          Promise.reject(
+            mockState.createError ?? new RateLimitError("rate limited", 429),
+          ),
         ),
       };
     }
@@ -37,7 +50,21 @@ vi.mock("@anthropic-ai/sdk", () => {
   return { default: MockAnthropic };
 });
 
+// このモジュールは vi.mock で差し替えられているため、実SDKの型(APIError等の
+// 本来の多引数コンストラクタ)ではなく、モック側の実際のコンストラクタ形状
+// (message, status?)に合わせた最小限の型で受け取る(any禁止のため unknown 経由)。
+interface MockAnthropicStatics {
+  BadRequestError: new (message: string, status?: number) => Error;
+  APIConnectionError: new (init: { message?: string }) => Error;
+}
+const Anthropic = (await import("@anthropic-ai/sdk"))
+  .default as unknown as MockAnthropicStatics;
 const { buildChatMessages, streamChat, extractCards } = await import("./api");
+
+afterEach(() => {
+  mockState.streamError = null;
+  mockState.createError = null;
+});
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -164,6 +191,51 @@ describe("streamChat (BYOK: SDK直呼び)", () => {
       onError,
     });
     expect(onError).toHaveBeenCalledWith("APIキーが無効です");
+  });
+
+  it("クレジット残高不足(400 BadRequestError, message部分一致)は専用の案内文に分岐する", async () => {
+    mockState.streamError = new Anthropic.BadRequestError(
+      "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+      400,
+    );
+    const onError = vi.fn();
+    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+      onDelta: vi.fn(),
+      onDone: vi.fn(),
+      onError,
+    });
+    expect(onError).toHaveBeenCalledWith(
+      "Anthropicのクレジット残高が不足しています。console.anthropic.com の Plans & Billing でクレジットを購入してください(APIキー自体は有効です)",
+    );
+  });
+
+  it("その他の400 BadRequestErrorは生JSONを出さず「リクエストエラー: (message)」に分岐する", async () => {
+    mockState.streamError = new Anthropic.BadRequestError(
+      "messages: at least one message is required",
+      400,
+    );
+    const onError = vi.fn();
+    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+      onDelta: vi.fn(),
+      onDone: vi.fn(),
+      onError,
+    });
+    expect(onError).toHaveBeenCalledWith(
+      "リクエストエラー: messages: at least one message is required",
+    );
+  });
+
+  it("APIConnectionErrorはネットワーク不通の案内文に分岐する", async () => {
+    mockState.streamError = new Anthropic.APIConnectionError({ message: "fetch failed" });
+    const onError = vi.fn();
+    await streamChat("sk-ant-valid", "claude-opus-4-8", BASE_PAYLOAD, {
+      onDelta: vi.fn(),
+      onDone: vi.fn(),
+      onError,
+    });
+    expect(onError).toHaveBeenCalledWith(
+      "ネットワークに接続できません。電波状況を確認して再送してください",
+    );
   });
 });
 

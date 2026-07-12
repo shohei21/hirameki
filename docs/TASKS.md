@@ -116,3 +116,25 @@ APIキーは各ユーザーが設定画面で入力し、その端末のlocalSto
 | T9 | 完了 | server/廃止・client/src/lib/prompts.ts へ一言一句そのまま移設。client/src/lib/api.ts をSDK直呼び(`dangerouslyAllowBrowser: true`)に書き換え、SSE手書きパーサは削除。設定画面(歯車アイコン→SettingsModal)でAPIキー(localStorage `hirameki:v1:settings`)・モデル(`claude-opus-4-8`/`claude-sonnet-5`)を保存。エラーはSDK型付き例外(AuthenticationError/RateLimitError/APIError)で分岐。vitestに@anthropic-ai/sdkモックでキー未設定・401・429分岐のテストを追加、SSEパーサのテストは削除。ルートpackage.jsonをclientのみのworkspaceに簡素化、vite.config.tsのproxy削除 |
 | T10 | 完了 | App.tsxに900px未満用のmobileTab状態(ステージ/チャット/ワークベンチ、初期値チャット)を追加し、main-layoutにdata-active-tab属性で連動。styles.cssに900px未満のメディアクエリを追加: 1カラム化、下部固定タブバー、チャット入力欄の固定フッター化(env(safe-area-inset-bottom)考慮)、閃きFABをタブバー上に再配置、モーダル全幅化。ステージステッパーは横スクロールチップ列にはせず既存の縦リストのまま(タブとして全画面表示されるため縦リストで十分と判断) |
 | T11 | 完了 | client/public/manifest.webmanifest(name/theme/アイコン192/512)+ apple-touch-icon.png。アイコンはNode組み込みzlibで生成した自作PNGエンコーダでSVGなしの単純な電球図形として作成(外部ツール不要)。Service Workerは導入しない判断とし、README.mdに理由を明記。vite.config.tsに`base: process.env.HIRAMEKI_BASE ?? "/"`を追加済み(T9で実施)。.github/workflows/deploy.ymlを新規作成(main push → HIRAMEKI_BASE=/hirameki/ npm run build → actions/deploy-pages、workflow_dispatchも許可)。YAML構文はpython yamlでロード確認済み。git操作は一切行っていない。README.mdをBYOK/スマホ使用法/デプロイ手順で全面更新 |
+
+## Phase 5: スマホ実使用フィードバック対応
+
+### T12 エラー表示・ズーム・データエクスポート
+背景: スマホ実機での初使用で3件のフィードバック。
+1. **エラーメッセージの人間化** (client/src/lib/api.ts のエラー分岐拡張):
+   - `Anthropic.BadRequestError` で message に "credit balance is too low" を含む場合 →「Anthropicのクレジット残高が不足しています。console.anthropic.com の Plans & Billing でクレジットを購入してください(APIキー自体は有効です)」
+   - その他の `BadRequestError` → 生JSONを出さず「リクエストエラー: (messageのみ)」
+   - `Anthropic.APIConnectionError` →「ネットワークに接続できません。電波状況を確認して再送してください」
+   - 判定は型付き例外+messageの部分一致(このケースはAPIがエラー種別を分けていないためやむを得ない)。UIのエラー表示が長文JSONで溢れないよう word-break と最大高さも整える
+2. **iOS自動ズーム防止**: input/textarea/select の font-size をモバイル(899px以下)で16px以上に統一。viewportメタに user-scalable=no は**使わない**(アクセシビリティ)。送信後にフォーカスが残って画面が寄る問題があれば blur で戻す
+3. **データのエクスポート/インポート** (設定モーダルに追加):
+   - エクスポート: 全データ(projects/cards/combinations/sparks/messages/schemaVersion)を1つのJSONにまとめ `hirameki-backup-YYYYMMDD.json` としてダウンロード(Blob+aタグ)
+   - インポート: ファイル選択→スキーマ検証(不正なら中断しエラー表示)→「現在のデータを上書きします」確認→storageへ書き込み→リロード
+   - settings(APIキー)は**含めない**(バックアップファイル経由のキー流出防止)
+- **AC**: typecheck/test/build green。エラー3分岐の単体テスト(SDKモック)。エクスポート→インポートのround-tripテスト。モバイル幅で入力欄フォントが16px以上であることをPlaywrightで確認
+
+## 進捗(Phase 5)
+
+| Task | 状態 | 備考 |
+|------|------|------|
+| T12 | 完了 | client/src/lib/api.ts: formatAnthropicErrorにBadRequestError(クレジット残高不足はmessage部分一致、他は「リクエストエラー: 」+message)とAPIConnectionErrorの分岐を追加。client/src/styles.css: .chat-error/.chat-extract-errorにword-break/max-height+overflow-yを追加し長文JSONで溢れないようにした。900px未満のメディアクエリにinput/textarea/selectのfont-size:16px統一ルールを追加(user-scalable=noは使わず)。Chat.tsxはtextareaにrefを追加し、モバイル幅では送信後にblurして画面が寄ったままにならないようにした。データのエクスポート/インポートはclient/src/lib/backup.ts(buildBackup/downloadBackup/validateBackup/applyBackup、settingsは対象外)を新設しSettingsModal.tsxに「データのバックアップ」セクションとして追加(エクスポート即ダウンロード、インポートはファイル選択→schemaVersion含む構造検証→window.confirmで上書き確認→保存→リロード)。vitest: api.test.tsにBadRequestError(クレジット残高不足/その他)・APIConnectionErrorの3分岐テストを追加(vi.hoistedでエラーを差し替え可能なモックに変更)、backup.test.tsを新規追加(round-trip・settings非混入・不正データ拒否)。typecheck/test(26件)/build すべてgreen。Playwright(NODE_PATH=planet-messenger, .cjs, port 5184)で375px幅の検証: チャット入力欄・素材カード追加欄・設定モーダルのAPIキー欄/モデルselectすべてfont-size 16px、設定モーダルに「データのバックアップ」見出し+エクスポート/インポートボタンが表示されることを確認。スクリーンショットをdocs/screenshots/mobile-07-chat-input.png, mobile-08-workbench-input.png, mobile-09-settings-backup.pngに保存 |

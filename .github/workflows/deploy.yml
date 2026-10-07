@@ -34,9 +34,16 @@ jobs:
         run: npm ci
 
       - name: Build (GitHub Pagesのサブパス /hirameki/ 用)
-        run: npm run build
+        run: npm run build -w client
         env:
           HIRAMEKI_BASE: /hirameki/
+
+      - name: Build Ippo (/hirameki/ippo/ に同居させる)
+        run: |
+          npm run build -w ippo
+          cp -r ippo/dist client/dist/ippo
+        env:
+          IPPO_BASE: /hirameki/ippo/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

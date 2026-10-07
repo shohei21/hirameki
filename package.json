@@ -3,12 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "client"
+    "client",
+    "ippo"
   ],
   "scripts": {
     "dev": "npm run dev -w client",
-    "build": "npm run build -w client",
-    "typecheck": "npm run typecheck -w client",
-    "test": "npm run test -w client"
+    "build": "npm run build -w client && npm run build -w ippo",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w ippo",
+    "test": "npm run test -w client && npm run test -w ippo",
+    "dev:ippo": "npm run dev -w ippo"
   }
 }
